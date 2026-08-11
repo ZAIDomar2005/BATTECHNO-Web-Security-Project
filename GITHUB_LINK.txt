@@ -1,0 +1,5 @@
+GitHub repository URL:
+
+[PASTE THE FINAL GITHUB REPOSITORY URL HERE]
+
+Before adding the URL, confirm that the repository does not contain .env, database credentials, reusable JWT values, or node_modules.
