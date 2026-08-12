@@ -1,0 +1,416 @@
+{
+  "info": {
+    "_postman_id": "battechno-web-security-collection-2026",
+    "name": "BATTECHNO Web Security Fundamentals - Task 3 Tests",
+    "description": "Postman Collection executing all 18 mandatory & scenario security tests for Node.js/Express API security audit.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+    { "key": "customerToken", "value": "", "type": "string" },
+    { "key": "adminToken", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1. Register New Customer User (201 Created)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"New Student User\",\n  \"email\": \"student_{{$randomInt}}@example.com\",\n  \"password\": \"SecurePass@123\",\n  \"role\": \"customer\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] }
+      }
+    },
+    {
+      "name": "2. Register User Duplicate Email (409 Conflict)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Duplicate Customer\",\n  \"email\": \"customer@battechno.com\",\n  \"password\": \"Customer@123456\",\n  \"role\": \"customer\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] }
+      }
+    },
+    {
+      "name": "3. Valid Login (200 OK)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('JWT token is returned', function () { pm.expect(jsonData.token).to.be.a('string').and.not.empty; });",
+              "if (jsonData.token) {",
+              "    pm.collectionVariables.set('customerToken', jsonData.token);",
+              "}",
+              "pm.visualizer.set('<h2>Valid Login - 200 OK</h2><p><b>JWT returned:</b> Yes (value hidden for security)</p><p><b>User:</b> {{name}}</p><p><b>Role:</b> {{role}}</p>', { name: jsonData.user.name, role: jsonData.user.role });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"customer@battechno.com\",\n  \"password\": \"Customer@123456\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+      }
+    },
+    {
+      "name": "4. Login Wrong Password (401 Unauthorized)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"customer@battechno.com\",\n  \"password\": \"WrongPassword999!\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+      }
+    },
+    {
+      "name": "5. Access Protected Route Without Token (401 Unauthorized)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "auth", "me"] }
+      }
+    },
+    {
+      "name": "6. Access Protected Route Invalid Token (401 Unauthorized)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer invalid_fake_token_string" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "auth", "me"] }
+      }
+    },
+    {
+      "name": "7. Customer Tries To Add Product (403 Forbidden)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.sendRequest({",
+              "    url: 'http://localhost:3000/api/auth/login',",
+              "    method: 'POST',",
+              "    header: { 'Content-Type': 'application/json' },",
+              "    body: { mode: 'raw', raw: JSON.stringify({ email: 'customer@battechno.com', password: 'Customer@123456' }) }",
+              "}, function (err, res) {",
+              "    if (!err && res.code === 200) {",
+              "        pm.collectionVariables.set('customerToken', res.json().token);",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{customerToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"category_id\": 1,\n  \"name\": \"Hacked Laptop\",\n  \"price\": 1200,\n  \"stock_quantity\": 5\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/products", "host": ["{{baseUrl}}"], "path": ["api", "products"] }
+      }
+    },
+    {
+      "name": "8. Admin Adds Product Successfully (201 Created)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.sendRequest({",
+              "    url: 'http://localhost:3000/api/auth/login',",
+              "    method: 'POST',",
+              "    header: { 'Content-Type': 'application/json' },",
+              "    body: { mode: 'raw', raw: JSON.stringify({ email: 'admin@battechno.com', password: 'Admin@123456' }) }",
+              "}, function (err, res) {",
+              "    if (!err && res.code === 200) {",
+              "        pm.collectionVariables.set('adminToken', res.json().token);",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"category_id\": 1,\n  \"name\": \"Encrypted Hard Drive\",\n  \"description\": \"1TB Hardware Encrypted Drive\",\n  \"price\": 199.99,\n  \"stock_quantity\": 25\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/products", "host": ["{{baseUrl}}"], "path": ["api", "products"] }
+      }
+    },
+    {
+      "name": "9. Add Product With Negative Price (400 Bad Request)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.sendRequest({",
+              "    url: 'http://localhost:3000/api/auth/login',",
+              "    method: 'POST',",
+              "    header: { 'Content-Type': 'application/json' },",
+              "    body: { mode: 'raw', raw: JSON.stringify({ email: 'admin@battechno.com', password: 'Admin@123456' }) }",
+              "}, function (err, res) {",
+              "    if (!err && res.code === 200) {",
+              "        pm.collectionVariables.set('adminToken', res.json().token);",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"category_id\": 1,\n  \"name\": \"Free Monitor\",\n  \"price\": -50,\n  \"stock_quantity\": 10\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/products", "host": ["{{baseUrl}}"], "path": ["api", "products"] }
+      }
+    },
+    {
+      "name": "10. Send Invalid Email (400 Bad Request)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Test User\",\n  \"email\": \"invalid-email-format\",\n  \"password\": \"short\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] }
+      }
+    },
+    {
+      "name": "11. IDOR Check: Access Unowned User Profile (403 Forbidden)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.sendRequest({",
+              "    url: 'http://localhost:3000/api/auth/login',",
+              "    method: 'POST',",
+              "    header: { 'Content-Type': 'application/json' },",
+              "    body: { mode: 'raw', raw: JSON.stringify({ email: 'customer@battechno.com', password: 'Customer@123456' }) }",
+              "}, function (err, res) {",
+              "    if (!err && res.code === 200) {",
+              "        pm.collectionVariables.set('customerToken', res.json().token);",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+        "url": { "raw": "{{baseUrl}}/api/users/1", "host": ["{{baseUrl}}"], "path": ["api", "users", "1"] }
+      }
+    },
+    {
+      "name": "12. Exceed Login Attempts Threshold (429 Too Many Requests)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "for (let i = 0; i < 5; i++) {",
+              "    pm.sendRequest({",
+              "        url: 'http://localhost:3000/api/auth/login',",
+              "        method: 'POST',",
+              "        header: { 'Content-Type': 'application/json' },",
+              "        body: { mode: 'raw', raw: JSON.stringify({ email: 'customer@battechno.com', password: 'WrongPasswordAttempts' }) }",
+              "    }, function (err, res) {});",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"customer@battechno.com\",\n  \"password\": \"WrongPasswordAttempts\"\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+      }
+    },
+    {
+      "name": "13. Request Non-Existent Endpoint (404 Not Found)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/api/unknown-endpoint", "host": ["{{baseUrl}}"], "path": ["api", "unknown-endpoint"] }
+      }
+    },
+    {
+      "name": "14. Confirm No password_hash In User Results (200 OK)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Response does not expose password_hash', function () {",
+              "    pm.expect(pm.response.text()).not.to.include('password_hash');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.sendRequest({",
+              "    url: 'http://localhost:3000/api/auth/login',",
+              "    method: 'POST',",
+              "    header: { 'Content-Type': 'application/json' },",
+              "    body: { mode: 'raw', raw: JSON.stringify({ email: 'customer@battechno.com', password: 'Customer@123456' }) }",
+              "}, function (err, res) {",
+              "    if (!err && res.code === 200) {",
+              "        pm.collectionVariables.set('customerToken', res.json().token);",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+        "url": { "raw": "{{baseUrl}}/api/users/2", "host": ["{{baseUrl}}"], "path": ["api", "users", "2"] }
+      }
+    },
+    {
+      "name": "15. Inspect Security Response Headers (Helmet Verification)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Helmet headers are present', function () {",
+              "    pm.expect(pm.response.headers.get('x-content-type-options')).to.eql('nosniff');",
+              "    pm.expect(pm.response.headers.get('x-frame-options')).to.exist;",
+              "    pm.expect(pm.response.headers.get('content-security-policy')).to.exist;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }
+      }
+    },
+    {
+      "name": "16. XSS Prevention Test: HTML In Description (Task 13)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.sendRequest({",
+              "    url: 'http://localhost:3000/api/auth/login',",
+              "    method: 'POST',",
+              "    header: { 'Content-Type': 'application/json' },",
+              "    body: { mode: 'raw', raw: JSON.stringify({ email: 'admin@battechno.com', password: 'Admin@123456' }) }",
+              "}, function (err, res) {",
+              "    if (!err && res.code === 200) {",
+              "        pm.collectionVariables.set('adminToken', res.json().token);",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"category_id\": 1,\n  \"name\": \"XSS Sanitized Product\",\n  \"description\": \"<script>alert('XSS')</script><b>Safe Description</b>\",\n  \"price\": 149.99,\n  \"stock_quantity\": 10\n}"
+        },
+        "url": { "raw": "{{baseUrl}}/api/products", "host": ["{{baseUrl}}"], "path": ["api", "products"] }
+      }
+    },
+    {
+      "name": "17. CORS Blocked Origin Test (Task 10)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Origin", "value": "http://unauthorized-hacker-domain.com" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/products", "host": ["{{baseUrl}}"], "path": ["api", "products"] }
+      }
+    },
+    {
+      "name": "18. IDOR Check: Access Unowned Order (Task 8 & 11)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.sendRequest({",
+              "    url: 'http://localhost:3000/api/auth/login',",
+              "    method: 'POST',",
+              "    header: { 'Content-Type': 'application/json' },",
+              "    body: { mode: 'raw', raw: JSON.stringify({ email: 'customer@battechno.com', password: 'Customer@123456' }) }",
+              "}, function (err, res) {",
+              "    if (!err && res.code === 200) {",
+              "        pm.collectionVariables.set('customerToken', res.json().token);",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{customerToken}}" }],
+        "url": { "raw": "{{baseUrl}}/api/orders/999", "host": ["{{baseUrl}}"], "path": ["api", "orders", "999"] }
+      }
+    }
+  ]
+}
